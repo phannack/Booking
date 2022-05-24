@@ -7,7 +7,7 @@ router.post("/table", tableController.newTable);
 router.delete("/table", tableController.clearTable);
 router.get("/table/:id", tableController.getTable);
 
-router.put("/table/reserve/:id", tableController.reserveTable);
+router.put("/table/reserve", tableController.reserveTable);
 router.put("/table/cancel/:id", tableController.cancelReserveTable);
 
 module.exports = router;
