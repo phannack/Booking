@@ -29,12 +29,9 @@ const newTable = (req, res, next) => {
       message: "create success",
       data: tables,
     });
-  } catch (error) {
-    throw ThrowError.BAD_REQUEST("Bad Request", error);
-  }
+  } catch (error) {}
 };
 
-//Clear Table'
 const clearTable = (req, res, next) => {
   try {
     tables = [];
@@ -45,12 +42,9 @@ const clearTable = (req, res, next) => {
       message: "clear data success",
       data: tables,
     });
-  } catch (error) {
-    throw ThrowError.BAD_REQUEST("Bad Request", error);
-  }
+  } catch (error) {}
 };
 
-//GET '/table/:id'
 const getTable = (req, res, next) => {
   try {
     const table = tables.find((table) => table.id === Number(req.params.id));
@@ -65,55 +59,8 @@ const getTable = (req, res, next) => {
 
     res.json({
       status: true,
-      message: "create success",
+      message: "get data success",
       data: tables[0],
-    });
-  } catch (error) {
-    throw ThrowError.BAD_REQUEST("Bad Request", error);
-  }
-};
-
-//PUT '/table/reserve/:id'
-const reserveTable2 = (req, res, next) => {
-  try {
-    const id = req.params.id;
-    const reserveIndex = tables.findIndex((table) => table.id === Number(id));
-
-    if (reserveIndex === -1) {
-      res.json({
-        status: false,
-        message: `Table id ${id} not found`,
-      });
-    }
-
-    if (tables[reserveIndex].isAvailable !== false) {
-      res.json({
-        status: false,
-        message: `Table id ${id} not available`,
-      });
-    }
-
-    const bookingInfo = req.body.bookingInfo;
-
-    const { customers } = bookingInfo;
-
-    if (customers < 1 || customers > 4) {
-      res.json({
-        status: false,
-        message: `can not reserve for ${customers}`,
-      });
-    }
-
-    tables[reserveIndex] = {
-      ...tables[reserveIndex],
-      isAvailable: false,
-      bookingInfo,
-    };
-
-    res.json({
-      status: true,
-      message: "reserve success",
-      data: tables[reserveIndex],
     });
   } catch (error) {}
 };
@@ -121,6 +68,7 @@ const reserveTable2 = (req, res, next) => {
 const reserveTable = (req, res, next) => {
   try {
     const { customers, name, tel } = req.body;
+
     if (customers < 1) {
       res.json({
         status: false,
@@ -134,10 +82,6 @@ const reserveTable = (req, res, next) => {
         message: `can not reserve cause table empty`,
       });
     }
-
-    /*const listTable = tables.filter(
-      ([key, value]) => value.isAvailable === true
-    );*/
 
     var listTableAvailable = tables.filter(function (el) {
       return el.isAvailable === true;
@@ -154,42 +98,52 @@ const reserveTable = (req, res, next) => {
     }
 
     let i = 1;
+    let tableIds = [];
+    const bookId =
+      bookings.reduce(
+        (acc, booking) => (acc = acc > booking.id ? acc : booking.id),
+        0
+      ) + 1;
+
     listTableAvailable.forEach((tbl, index) => {
       if (index >= tableReserve) {
         return;
       }
 
-      const maxId =
-        bookings.reduce(
-          (acc, booking) => (acc = acc > booking.id ? acc : booking.id),
-          0
-        ) + 1;
-
-      console.log("--maxId", maxId);
-
-      bookings.push({
-        id: maxId,
-        tableId: tbl.id,
-        customers,
-        name,
-        tel,
-      });
+      tableIds.push(tbl.id);
 
       const reserveIndex = tables.findIndex((t) => t.id === Number(tbl.id));
       tables[reserveIndex] = {
         ...tables[reserveIndex],
         isAvailable: false,
+        bookId,
       };
+    });
+
+    bookings.push({
+      id: bookId,
+      tableIds,
+      customers,
+      name,
+      tel,
     });
 
     res.json({
       status: true,
       message: `reserve success`,
-      data: bookings,
+      reserveInformation: {
+        bookId,
+        tableReserve,
+        tableIds,
+        customers,
+        name,
+        tel,
+      },
+      remainTables: tables.filter(function (element) {
+        return element.isAvailable === true;
+      }).length,
     });
-  } catch (error) {
-    throw new Error(error.toString());
-  }
+  } catch (error) {}
 };
 
 //PUT '/table/cancel/:id'
@@ -200,10 +154,6 @@ const cancelReserveTable = (req, res, next) => {
       (booking) => booking.id === Number(id)
     );
 
-    console.log("--id", id);
-    console.log("--bookings", bookings);
-    console.log("--reserveIndex", reserveIndex);
-
     if (reserveIndex === -1) {
       res.json({
         status: false,
@@ -211,13 +161,14 @@ const cancelReserveTable = (req, res, next) => {
       });
     }
 
-    const tableIndex = tables.findIndex(
-      (t) => t.id === Number(bookings[reserveIndex].tableId)
-    );
-    tables[tableIndex] = {
-      ...tables[tableIndex],
-      isAvailable: true,
-    };
+    bookings[reserveIndex].tableIds.forEach((tbl) => {
+      const tableIndex = tables.findIndex((t) => t.id === Number(tbl));
+      tables[tableIndex] = {
+        ...tables[tableIndex],
+        isAvailable: true,
+        bookId: null,
+      };
+    });
 
     res.json({
       status: true,
@@ -227,7 +178,6 @@ const cancelReserveTable = (req, res, next) => {
   } catch (error) {}
 };
 
-//export controller functions
 module.exports = {
   getAllTable,
   newTable,
